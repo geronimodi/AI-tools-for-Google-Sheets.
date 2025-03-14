@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: sans-serif; }
+    .input-group { margin-bottom: 10px; }
+    label { display: block; margin-bottom: 5px; }
+    input[type="text"] { width: 100%; padding: 8px; box-sizing: border-box; }
+    button { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+    #error-message { color: red; margin-top: 10px; }
+     #status-message {  margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="input-group">
+    <label for="sourceRange">Диапазон с данными (откуда извлекать):</label>
+    <input type="text" id="sourceRange" placeholder="Например: A1:A3">
+  </div>
+  <div class="input-group">
+    <label for="insertRange">Диапазон для вставки (куда вставлять):</label>
+    <input type="text" id="insertRange" placeholder="Например: C1:C3">
+  </div>
+  <div class="input-group">
+    <label for="headers">Заголовки данных (через запятую):</label>
+    <input type="text" id="headers" placeholder="Например: Телефон, Адрес, Сайт">
+  </div>
+  <button onclick="extractDataFromDialog()">Извлечь</button>
+  <div id="error-message"></div>
+  <div id="status-message"></div>
+
+  <script>
+    function extractDataFromDialog() {
+      // Очищаем сообщение об ошибке
+      document.getElementById('error-message').textContent = '';
+      setStatusMessage(''); //Очистка
+
+      const sourceRange = document.getElementById('sourceRange').value.trim();
+      const insertRange = document.getElementById('insertRange').value.trim();
+      const headers = document.getElementById('headers').value.trim();
+
+      if (!sourceRange) {
+        document.getElementById('error-message').textContent = 'Укажите диапазон с данными.';
+        return;
+      }
+      if (!insertRange) {
+        document.getElementById('error-message').textContent = 'Укажите диапазон для вставки.';
+        return;
+      }
+      if (!headers) {
+           document.getElementById('error-message').textContent = 'Укажите заголовки данных.';
+           return;
+      }
+
+      google.script.run
+        .withSuccessHandler(closeDialog)
+        .withFailureHandler(showError)
+        .extractData(sourceRange, insertRange, headers);
+    }
+
+    function closeDialog(result) {
+
+      google.script.host.close();
+        if (result) {
+            setStatusMessage(result); // успех
+
+        }
+    }
+
+    function showError(error) {
+      document.getElementById('error-message').textContent = error.message || error;
+    }
+
+     function setStatusMessage(message, color = 'black') { //Добавили
+         document.getElementById('status-message').textContent = message;
+         document.getElementById('status-message').style.color = color;
+       }
+  </script>
+</body>
+</html>

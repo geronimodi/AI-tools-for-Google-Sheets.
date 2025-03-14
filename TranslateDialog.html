@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: sans-serif; }
+    label { display: block; margin-bottom: 5px; }
+    input[type="text"] { width: 100%; padding: 8px; box-sizing: border-box; margin-bottom: 10px; }
+    button { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+    #error-message { color: red; margin-top: 10px; }
+     #status-message {  margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <label for="language">Введите название языка:</label>
+    <input type="text" id="language" placeholder="Например: Немецкий">
+  <button onclick="translateCell()">Перевести</button>
+  <div id="error-message"></div>
+    <div id="status-message"></div>
+
+  <script>
+    function translateCell() {
+      const language = document.getElementById('language').value.trim();
+      document.getElementById('error-message').textContent = '';
+        setStatusMessage('');
+      if (!language) {
+        document.getElementById('error-message').textContent = 'Введите название языка.';
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(showSuccess)
+        .withFailureHandler(showError)
+        .translateRange(language, getSelectedRange()); // вызываем translateRange
+    }
+     function getSelectedRange() { // Получаем адрес с клиента
+        return google.script.run.withSuccessHandler(function(range) {
+            return range;
+        }).getSelectedRangeA1Notation(); // вызываем серверную
+    }
+    function closeDialog(result) {
+
+      google.script.host.close();
+        if (result) {
+            setStatusMessage(result);
+
+        }
+    }
+
+    function showError(error) {
+      document.getElementById('error-message').textContent = error.message || error;
+    }
+    function setStatusMessage(message, color = 'black') { //Добавили
+         document.getElementById('status-message').textContent = message;
+         document.getElementById('status-message').style.color = color;
+       }
+
+  </script>
+</body>
+</html>

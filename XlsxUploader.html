@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: 'Roboto', sans-serif;
+            padding: 10px;
+        }
+        .button {
+            background-color: #FFD700;
+            border: none;
+            color: black;
+            padding: 10px 20px;
+            text-align: center;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        #file-input {
+            display: none;
+        }
+        #file-input-label {
+            background-color: #FFD700;
+            border: none;
+            color: black;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        #drop-area {
+            border: 2px dashed #666;
+            padding: 20px;
+            margin: 10px 0;
+            text-align: center;
+            border-radius: 8px;
+        }
+         #drop-area.drag-over {
+           border-color: #FFD700;
+           background-color: rgba(255, 215, 0, 0.2);
+         }
+        #file-list {
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #666;
+            border-radius: 4px;
+            padding: 5px;
+        }
+        #file-list div {
+          padding: 2px 5px;
+        }
+
+        #status-message {
+            margin-top: 10px;
+            font-style: italic;
+            color: #999;
+        }
+        .hidden {
+            display: none;
+        }
+
+        /* Стили для заблокированной кнопки */
+        .button[disabled] {
+            background-color: #999;
+            color: #666;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+</head>
+<body>
+    <h2>Загрузка XLSX</h2>
+    <label for="file-input" id="file-input-label">Выбрать файл</label>
+    <input type="file" id="file-input" accept=".xlsx" multiple>
+    <div id="drop-area">Перетащите файлы сюда</div>
+    <div id="file-list"></div>
+    <button class="button" onclick="processQueue()" id="upload-button" disabled>Обработать все</button>
+
+    <div id="status-message"></div>
+
+    <script>
+        let fileQueue = [];
+        let processing = false;
+
+      async function processQueue() {
+        if (processing || fileQueue.length === 0) return;
+
+        processing = true;
+        const uploadButton = document.getElementById('upload-button');
+        uploadButton.disabled = true; // Отключаем кнопку (теперь визуально видно)
+        setStatusMessage("Обработка...");
+
+        const totalFiles = fileQueue.length;
+
+        try {
+          for (let i = 0; i < totalFiles; i++) {
+            const file = fileQueue[i];
+            await uploadSingleFile(file);
+          }
+          setStatusMessage("Готово!");
+
+        } finally {
+          setTimeout(() => {
+            setStatusMessage("");
+            processing = false;
+            uploadButton.disabled = fileQueue.length === 0; // Включаем кнопку
+            fileQueue = [];
+            document.getElementById('file-list').innerHTML = "";
+          }, 3000);
+        }
+      }
+
+      function uploadSingleFile(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.onload = function(e) {
+            const data = e.target.result.split(',')[1];
+            const fileData = {
+              name: file.name,
+              type: file.type,
+              data: data
+            };
+
+            google.script.run
+              .withSuccessHandler(result => {
+                if (result.error) {
+                  setStatusMessage(`Ошибка обработки ${file.name}: ${result.error}`, 'red');
+                  reject(result.error);
+                } else {
+                  google.script.run
+                    .withSuccessHandler(() => {
+                      resolve();
+                    })
+                    .withFailureHandler(error => {
+                      setStatusMessage(`Ошибка анализа ${file.name}: ${error}`, 'red');
+                      reject(error);
+                    })
+                    .analyzeAndInsertData(result.tempSheetId, result.xlsxFileId);
+                }
+              })
+              .withFailureHandler(error => {
+                setStatusMessage(`Ошибка загрузки ${file.name}: ${error}`, 'red');
+                reject(error);
+              })
+              .processXlsxFile(fileData);
+        };
+
+        reader.onerror = () => {
+          setStatusMessage(`Ошибка чтения файла ${file.name}`, 'red');
+          reject();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+        const dropArea = document.getElementById('drop-area');
+
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('drag-over');
+        });
+
+        dropArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('drag-over');
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            let added = false;
+          Array.from(files).forEach(file => {
+            if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+              if (!fileQueue.some(existingFile => existingFile.name === file.name)) {
+                fileQueue.push(file);
+                document.getElementById('file-list').innerHTML += `<div>${file.name}</div>`;
+                added = true;
+              } else {
+                 setStatusMessage(`Файл ${file.name} уже добавлен.`, 'orange');
+              }
+
+            } else {
+                setStatusMessage(`Неподдерживаемый тип файла: ${file.name}`, 'red');
+            }
+          });
+          if(added){
+            document.getElementById('upload-button').disabled = false;
+          }
+
+        }
+
+       function setStatusMessage(message, color = 'white') {
+         document.getElementById('status-message').textContent = message;
+         document.getElementById('status-message').style.color = color;
+       }
+
+    </script>
+</body>
+</html>
